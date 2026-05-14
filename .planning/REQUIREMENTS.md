@@ -68,9 +68,9 @@
 
 ### Advanced Scoring
 
-- [ ] **ADVSC-01**: Hook score considera: pergunta inicial, declaração impactante
-- [ ] **ADVSC-02**: Viral score considera: citação compartilhável, estatística, polêmica
-- [ ] **ADVSC-03**: Duration score considera: proximidade do target vs min/max
+- [x] **ADVSC-01**: Hook score considera: pergunta inicial, declaração impactante
+- [x] **ADVSC-02**: Viral score considera: citação compartilhável, estatística, polêmica
+- [x] **ADVSC-03**: Duration score considera: proximidade do target vs min/max
 
 ## Out of Scope
 

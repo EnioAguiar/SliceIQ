@@ -184,17 +184,41 @@ Retorne {num_candidates} candidatos em formato JSON:
             for c in self._state["candidates"]
         ])
 
-        prompt = f"""Avalie cada candidato quanto a:
-1. HOOK_SCORE (0-100): Quão forte é o início? Captura atenção imediatamente?
-2. VIRAL_SCORE (0-100): Potencial para viralizar/engajar? Contém citação marcante, número impactante, ou polêmica?
-3. DURATION_SCORE (0-100): Comply com {self.profile.duration_min}-{self.profile.duration_max}s range?
+        target = (self.profile.duration_min + self.profile.duration_max) / 2
+        duration_range = self.profile.duration_max - self.profile.duration_min
 
-Duração desejada: target={self.profile.duration_min}s, min={self.profile.duration_min}s, max={self.profile.duration_max}s
+        prompt = f"""Avalie cada candidato quanto a 3 critérios com scores de 0-100:
+
+1. HOOK_SCORE (40% do total): Quão forte é o início do highlight?
+   - Pergunta retórica captura atenção? (ex: "Você sabia que...", "E se eu te dissesse que...")
+   - Declaração impactante ou polêmica? (ex: "Ninguém esperava isso", "Isso vai mudar tudo")
+   - Citação forte ou declaração definitiva? (ex: "Sempre disse que...", "Nunca ninguém fez isso")
+   - SCORE ALTO: início com pergunta/declaração forte
+   - SCORE BAIXO: início comum, sem destaque
+
+2. VIRAL_SCORE (30% do total): Potencial para viralizar/engajar?
+   - Número grande ou estatística impressionante? (ex: "97%", "milhões", "biliões")
+   - Citação compartilhável? (frase que gente quer enviar)
+   - Palavras fortes de impacto? (nunca, sempre, todo, ninguém, todos)
+   - Polêmica ou controvérsia? (declarações fortes)
+   - SCORE ALTO: contém elemento viral conhecido
+   - SCORE BAIXO: conteúdo comum, sem elemento compartilhável
+
+3. DURATION_SCORE (30% do total): Quão bem respeita a duração target?
+   - Target: {target:.0f}s, Range: {duration_range:.0f}s ({self.profile.duration_min:.0f}s - {self.profile.duration_max:.0f}s)
+   - Formula: score = 100 - (|duration - target| / range) * 100
+   - Exemplo: se target={target:.0f}s e range={duration_range:.0f}s, uma duração de {target - duration_range/4:.0f}s teria score ~75
+   - SCORE ALTO: duração próxima do target
+   - SCORE BAIXO: duração longe do target (muito curto ou muito longo)
+
+Duração real de cada candidato deve ser calculada como: end - start
 
 Candidatos:
 {candidates_list}
 
-Retorne JSON com scores para cada candidato:
+Raciocínio: Analisando cada candidato... penso sobre hook forte, elemento viral, e proximidade do target... calculo scores...
+
+→ JSON Output (use duration_score baseado em formula, não apenas comply):
 {{"scored": [
   {{"start": float, "end": float, "hook_score": int, "viral_score": int, "duration_score": int}}
 ]}}"""
@@ -215,14 +239,23 @@ Retorne JSON com scores para cada candidato:
         if not match:
             return []
 
+        target = (self.profile.duration_min + self.profile.duration_max) / 2
+        duration_range = self.profile.duration_max - self.profile.duration_min
+
         data = json.loads(match.group())
         scored_list = []
 
         for item in data.get("scored", []):
             hook = item.get("hook_score", 50)
             viral = item.get("viral_score", 50)
-            duration = item.get("duration_score", 50)
-            total = int(hook * 0.4 + viral * 0.3 + duration * 0.3)
+
+            duration = item.get("end", 0) - item.get("start", 0)
+            if duration_range > 0:
+                duration_score = max(0, min(100, int(100 - (abs(duration - target) / duration_range) * 100)))
+            else:
+                duration_score = 50
+
+            total = int(hook * 0.4 + viral * 0.3 + duration_score * 0.3)
 
             scored_list.append(ScoredHighlight(
                 start=item["start"],
@@ -231,7 +264,7 @@ Retorne JSON com scores para cada candidato:
                 reason=item.get("reason", ""),
                 hook_score=hook,
                 viral_score=viral,
-                duration_score=duration,
+                duration_score=duration_score,
                 total_score=total,
                 rank=0,
             ))
