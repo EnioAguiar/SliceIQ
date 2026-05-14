@@ -15,11 +15,44 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize
 from PyQt6.QtGui import QColor, QPalette, QFont
 
-from core.workflow import VideoClippingWorkflow, WorkflowStage
 from models.profile import Profile
 from models.highlight import ScoredHighlight
 
 logger = logging.getLogger(__name__)
+
+
+class WorkflowWorker(QThread):
+    progress = pyqtSignal(int, str, str)
+    finished = pyqtSignal(list)
+    error = pyqtSignal(str)
+
+    def __init__(self, video_path, profile, analyzer):
+        super().__init__()
+        self.video_path = video_path
+        self.profile = profile
+        self.analyzer = analyzer
+
+    def run(self):
+        try:
+            from core.workflow import VideoClippingWorkflow, WorkflowStage
+
+            workflow = VideoClippingWorkflow(self.video_path, self.profile, self.analyzer)
+
+            self.progress.emit(20, "Loading video...", "Stage: Candidates")
+            workflow.execute_stage(WorkflowStage.CANDIDATES_GENERATED)
+
+            self.progress.emit(50, "Scoring candidates...", "Stage: Scoring")
+            workflow.execute_stage(WorkflowStage.SCORED)
+
+            self.progress.emit(70, "Selecting highlights...", "Stage: Selection")
+            workflow.execute_stage(WorkflowStage.VALIDATED)
+
+            self.progress.emit(100, "Complete!", "Stage: Complete")
+            self.finished.emit(workflow.scored_candidates)
+
+        except Exception as e:
+            logger.error(f"Workflow error: {e}", exc_info=True)
+            self.error.emit(str(e))
 
 
 STYLESHEET_DARK = """
@@ -164,8 +197,8 @@ class WorkflowDialog(QDialog):
         layout.setSpacing(16)
 
         layout.addWidget(self._create_stage_progress())
-        layout.addWidget(self._create_content_area())
         layout.addWidget(self._create_button_bar())
+        layout.addWidget(self._create_content_area())
 
     def _create_stage_progress(self):
         container = QFrame()
@@ -432,65 +465,44 @@ class WorkflowDialog(QDialog):
 
     def _start_analysis(self):
         self._show_stage(Stage.ANALYZE)
-        self.analyze_progress.setValue(10)
-        self.analyze_status.setText("Loading video...")
+        self.analyze_progress.setValue(5)
+        self.analyze_status.setText("Initializing workflow...")
         self.analyze_substages.setText("Stage: Loading")
         QApplication.processEvents()
 
-        try:
-            from core import VideoProcessor, Transcript, Analyzer
-            from config.llm_config import LLMConfig
+        from core import VideoProcessor, Transcript, Analyzer
+        from config.llm_config import LLMConfig
 
-            processor = VideoProcessor()
-            self.analyze_progress.setValue(20)
-            self.analyze_status.setText("Processing video...")
-            self.analyze_substages.setText("Stage: Transcript")
-            QApplication.processEvents()
+        provider = "minimax" if LLMConfig.MINIMAX_API_KEY else "mock"
+        analyzer = Analyzer(provider=provider)
 
-            transcript = Transcript()
-            self.analyze_progress.setValue(40)
-            self.analyze_status.setText("Extracting highlights...")
-            self.analyze_substages.setText("Stage: Candidates")
-            QApplication.processEvents()
+        if self.profiles:
+            profile = self.profiles[0]
+        else:
+            profile = Profile(name="default", format="16:9", duration_min=60, duration_max=300, quantity=5)
 
-            provider = "minimax" if LLMConfig.MINIMAX_API_KEY else "mock"
-            analyzer = Analyzer(provider=provider)
+        self._worker = WorkflowWorker(self.video_path, profile, analyzer)
+        self._worker.progress.connect(self._on_worker_progress)
+        self._worker.finished.connect(self._on_worker_finished)
+        self._worker.error.connect(self._on_worker_error)
+        self._worker.start()
 
-            if self.profiles:
-                profile = self.profiles[0]
-            else:
-                profile = Profile(name="default", format="16:9", duration_min=60, duration_max=300, quantity=5)
+    def _on_worker_progress(self, value, status, substage):
+        self.analyze_progress.setValue(value)
+        self.analyze_status.setText(status)
+        self.analyze_substages.setText(substage)
 
-            workflow = VideoClippingWorkflow(self.video_path, profile, analyzer)
+    def _on_worker_finished(self, scored_highlights):
+        self.scored_highlights = scored_highlights
+        self.highlights = scored_highlights
 
-            self.analyze_progress.setValue(60)
-            self.analyze_substages.setText("Stage: Scoring")
-            QApplication.processEvents()
+        self._populate_review_table()
+        self._show_stage(Stage.REVIEW)
 
-            workflow.execute_stage(WorkflowStage.CANDIDATES_GENERATED)
-
-            self.analyze_progress.setValue(80)
-            self.analyze_substages.setText("Stage: Selection")
-            QApplication.processEvents()
-
-            workflow.execute_stage(WorkflowStage.SCORED)
-
-            self.scored_highlights = workflow.scored_candidates
-            workflow.execute_stage(WorkflowStage.VALIDATED)
-            self.highlights = workflow.validated_highlights
-
-            self.analyze_progress.setValue(100)
-            self.analyze_status.setText(f"Found {len(self.highlights)} highlights!")
-            self.analyze_substages.setText("Stage: Complete")
-
-            self._populate_review_table()
-
-            self._show_stage(Stage.REVIEW)
-
-        except Exception as e:
-            logger.error(f"Analysis error: {e}", exc_info=True)
-            self.analyze_status.setText(f"Error: {str(e)}")
-            self.analyze_status.setStyleSheet("color: #EF4444;")
+    def _on_worker_error(self, error_msg):
+        logger.error(f"Analysis error: {error_msg}")
+        self.analyze_status.setText(f"Error: {error_msg}")
+        self.analyze_status.setStyleSheet("color: #EF4444;")
 
     def _populate_review_table(self):
         self.highlights_table.setRowCount(0)
@@ -505,15 +517,15 @@ class WorkflowDialog(QDialog):
             self.highlights_table.setItem(row, 2, QTableWidgetItem(f"{duration:.1f}s"))
 
             hook_item = QTableWidgetItem(str(h.get("hook_score", 0)))
-            hook_item.setBackground(QColor("#22C55E") if h.get("hook_score", 0) > 70 else ("#F59E0B" if h.get("hook_score", 0) > 50 else "#EF4444"))
+            hook_item.setBackground(QColor("#22C55E") if h.get("hook_score", 0) > 70 else (QColor("#F59E0B") if h.get("hook_score", 0) > 50 else QColor("#EF4444")))
             self.highlights_table.setItem(row, 3, hook_item)
 
             viral_item = QTableWidgetItem(str(h.get("viral_score", 0)))
-            viral_item.setBackground(QColor("#22C55E") if h.get("viral_score", 0) > 70 else ("#F59E0B" if h.get("viral_score", 0) > 50 else "#EF4444"))
+            viral_item.setBackground(QColor("#22C55E") if h.get("viral_score", 0) > 70 else (QColor("#F59E0B") if h.get("viral_score", 0) > 50 else QColor("#EF4444")))
             self.highlights_table.setItem(row, 4, viral_item)
 
             total_item = QTableWidgetItem(str(h.get("total_score", 0)))
-            total_item.setBackground(QColor("#22C55E") if h.get("total_score", 0) > 70 else ("#F59E0B" if h.get("total_score", 0) > 50 else "#EF4444"))
+            total_item.setBackground(QColor("#22C55E") if h.get("total_score", 0) > 70 else (QColor("#F59E0B") if h.get("total_score", 0) > 50 else QColor("#EF4444")))
             self.highlights_table.setItem(row, 5, total_item)
 
             for col in range(6):

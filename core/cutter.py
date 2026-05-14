@@ -1,6 +1,8 @@
 import ffmpeg
 from pathlib import Path
-from models.profile import Profile
+import logging
+
+logger = logging.getLogger(__name__)
 
 class Cutter:
     ASPECT_RATIOS = {
@@ -43,8 +45,19 @@ class Cutter:
 
         output_path = self.output_dir / output_name
 
-        stream = ffmpeg.input(str(input_path), ss=start, t=duration)
-        stream = ffmpeg.output(stream, str(output_path), vcodec="libx264", acodec="aac")
-        ffmpeg.run(stream, overwrite_output=True, quiet=True)
+        logger.info(f"Cutting {start:.1f}s - {end:.1f}s (duration: {duration:.1f}s)...")
 
+        stream = ffmpeg.input(str(input_path), ss=start, t=duration)
+        stream = ffmpeg.output(
+            stream,
+            str(output_path),
+            vcodec="libx264",
+            acodec="aac",
+            preset="fast",
+            crf=23,
+           threads=4
+        )
+        ffmpeg.run(stream, overwrite_output=True, quiet=False, capture_stdout=True, capture_stderr=True)
+
+        logger.info(f"Saved: {output_path.name}")
         return output_path

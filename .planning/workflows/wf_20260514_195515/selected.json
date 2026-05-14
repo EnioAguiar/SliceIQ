@@ -1,0 +1,35 @@
+[
+  {
+    "start": 2384.9,
+    "end": 2430.0,
+    "score": 50,
+    "reason": "",
+    "hook_score": 89,
+    "viral_score": 92,
+    "duration_score": 99,
+    "total_score": 92,
+    "rank": 1
+  },
+  {
+    "start": 240.8,
+    "end": 289.9,
+    "score": 50,
+    "reason": "",
+    "hook_score": 90,
+    "viral_score": 91,
+    "duration_score": 86,
+    "total_score": 89,
+    "rank": 2
+  },
+  {
+    "start": 303.9,
+    "end": 345.0,
+    "score": 50,
+    "reason": "",
+    "hook_score": 88,
+    "viral_score": 90,
+    "duration_score": 87,
+    "total_score": 88,
+    "rank": 3
+  }
+]

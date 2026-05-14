@@ -61,6 +61,10 @@ class VideoClippingWorkflow:
     def selected_highlights(self) -> list[dict]:
         return self._state["selected_highlights"]
 
+    @property
+    def validated_highlights(self) -> list[dict]:
+        return self._state.get("validated_highlights", [])
+
     def save_state(self):
         self._state["updated_at"] = datetime.now().isoformat()
         state_file = self._workflow_dir / "state.json"
@@ -145,29 +149,68 @@ class VideoClippingWorkflow:
 
         num_candidates = self.profile.quantity * 3
 
-        prompt = f"""Analise o transcript e identifique {num_candidates} momentos potenciais para highlights.
+        if len(segments) > 500:
+            step = len(segments) // 500
+            sampled_segments = segments[::step]
+            segments_text = "\n".join([
+                f"[{s['start']:.1f}s - {s['end']:.1f}s]: {s['text']}"
+                for s in sampled_segments
+            ])
+            logger.warning(f"Transcript sampled: {len(segments)} segments → {len(sampled_segments)} (1 of every {step})")
 
-REGRAS OBRIGATÓRIAS:
-- Cada highlight deve ter entre {self.profile.duration_min}s e {self.profile.duration_max}s
-- Timestamps devem ser momentos distintos, não consecutivos
-- Priorizar momentos com hook forte (pergunta, declaração impactante)
-- Priorizar momentos com alto potencial viral (engagement drivers)
-- Timestamps devem ser em SEGUNDOS EXATOS (ex: 125.5, não 2:05)
+        duration_target = (self.profile.duration_min + self.profile.duration_max) / 2
 
-Transcript:
-{segments_text}
+        prompt = f"""Analise o transcript e identifique {num_candidates} momentos para video highlights.
 
-Retorne {num_candidates} candidatos em formato JSON:
+DURAÇÃO ALVO: {self.profile.duration_min}s a {self.profile.duration_max}s por highlight
+DICA: Para alcançar {duration_target:.0f}s, COMBINE múltiplos segmentos consecutivos do transcript.
+
+COMO COMBINAR:
+- Highlight NÃO precisa começar/endar em boundaries de segmento
+- Você PODE usar: start=100.0, end=450.0 (mesmo que transcript mostre 100-105, 105-110, etc.)
+- Combine segmentos que seguem naturalmente um do outro
+- O texto entre start e end será concatenado automaticamente
+
+REGRAS:
+1. Duration = end - start DEVE estar entre {self.profile.duration_min}s e {self.profile.duration_max}s
+2. PRIORIZAR durations perto de {duration_target:.0f}s (meio do range)
+3. Highlights devem fazer sentido narrativo (conversa连贯, não cortado)
+4. Timestamps com 1 casa decimal (ex: 125.5)
+
+Output JSON:
 {{"candidates": [
   {{"start": float, "end": float, "score": int, "reason": str}}
-]}}"""
+]}}
 
+⚠️ REJEITADO se duration < {self.profile.duration_min}s ou > {self.profile.duration_max}s
+
+Transcript (timestamps em segundos):
+{segments_text}
+
+Escolha {num_candidates} momentos que:
+- Respeitam duration {self.profile.duration_min}-{self.profile.duration_max}s
+- Têm continuidade narrativa (conteúdo连贯)
+- Têm alto potencial viral/engagement"""
+
+        logger.info(f"Calling LLM for {num_candidates} candidates...")
         response = self.analyzer._call_llm(prompt, num_candidates)
+        logger.info(f"LLM response received, length: {len(response)} chars")
         candidates = self.analyzer._parse_response(response)
+        logger.info(f"Parsed {len(candidates)} candidates")
+
+        valid_candidates = []
+        for c in candidates:
+            duration = c.end - c.start
+            if self.profile.duration_min <= duration <= self.profile.duration_max:
+                valid_candidates.append(c)
+            else:
+                logger.warning(f"Candidate rejected: duration {duration:.1f}s outside range [{self.profile.duration_min:.0f}-{self.profile.duration_max:.0f}]")
+
+        logger.info(f"Candidates: {len(valid_candidates)} valid / {len(candidates)} total")
 
         self._state["candidates"] = [
             {"start": c.start, "end": c.end, "score": c.score, "reason": c.reason}
-            for c in candidates
+            for c in valid_candidates
         ]
         self._state["stage"] = WorkflowStage.CANDIDATES_GENERATED.value
 
@@ -312,22 +355,14 @@ Raciocínio: Analisando cada candidato... penso sobre hook forte, elemento viral
             raise WorkflowError("No selected highlights. Run SELECT first.")
 
         validated = []
-        re_evaluated = []
 
         for item in selected:
             duration = item["end"] - item["start"]
             min_dur = self.profile.duration_min
             max_dur = self.profile.duration_max
 
-            if duration < min_dur:
-                extension = min_dur - duration
-                extension_pct = (extension / duration) * 100 if duration > 0 else 100
-                if extension_pct > 30:
-                    re_evaluated.append(item)
-                    continue
-                item["end"] = item["start"] + min_dur
-            elif duration > max_dur:
-                item["end"] = item["start"] + max_dur
+            if duration < min_dur or duration > max_dur:
+                continue
 
             if item.get("total_score", 0) < self.profile.score_minimum:
                 continue
@@ -335,7 +370,6 @@ Raciocínio: Analisando cada candidato... penso sobre hook forte, elemento viral
             validated.append(item)
 
         self._state["validated_highlights"] = validated
-        self._state["re_evaluated"] = re_evaluated
         self._state["stage"] = WorkflowStage.VALIDATED.value
 
         validated_file = self._workflow_dir / "validated.json"

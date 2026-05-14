@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
     QLabel, QPushButton, QLineEdit, QSpinBox,
     QProgressBar, QTextEdit, QTableWidget, QTableWidgetItem,
     QHeaderView, QFrame, QApplication, QSplitter, QStackedWidget,
-    QAbstractItemView
+    QAbstractItemView, QFileDialog
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QColor
@@ -210,6 +210,18 @@ class WorkflowWindow(QMainWindow):
         self.url_input.setPlaceholderText("https://www.youtube.com/watch?v=...")
         layout.addWidget(self.url_input)
 
+        local_layout = QHBoxLayout()
+        local_layout.setSpacing(8)
+        btn_browse = QPushButton("Browse...")
+        btn_browse.setFixedWidth(80)
+        btn_browse.clicked.connect(self._on_browse_video)
+        self.local_path_input = QLineEdit()
+        self.local_path_input.setPlaceholderText("Or select local file...")
+        self.local_path_input.setReadOnly(True)
+        local_layout.addWidget(btn_browse)
+        local_layout.addWidget(self.local_path_input)
+        layout.addLayout(local_layout)
+
         layout.addSpacing(8)
         layout.addWidget(QLabel("Duration"))
         duration_layout = QHBoxLayout()
@@ -330,10 +342,19 @@ class WorkflowWindow(QMainWindow):
         layout = QVBoxLayout(widget)
         layout.setSpacing(16)
 
-        placeholder = QLabel("Enter YouTube URL in the sidebar and click START WORKFLOW")
-        placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        placeholder.setStyleSheet("color: #6B7280; font-size: 16px;")
-        layout.addWidget(placeholder)
+        self.upload_title = QLabel("Video Ready")
+        self.upload_title.setStyleSheet("font-size: 18px; font-weight: bold; color: #F9FAFB;")
+        layout.addWidget(self.upload_title)
+
+        self.upload_url_label = QLabel("YouTube URL: (enter in sidebar)")
+        self.upload_url_label.setStyleSheet("color: #9CA3AF; font-size: 12px;")
+        self.upload_url_label.setWordWrap(True)
+        layout.addWidget(self.upload_url_label)
+
+        self.upload_status_label = QLabel("Waiting for workflow start...")
+        self.upload_status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.upload_status_label.setStyleSheet("color: #6B7280; font-size: 14px;")
+        layout.addWidget(self.upload_status_label)
 
         layout.addStretch()
         return widget
@@ -394,8 +415,13 @@ class WorkflowWindow(QMainWindow):
         layout.addWidget(self.highlights_table)
 
         info = QLabel("Highlights to export")
-        info.setStyleSheet("color: #6B7280; font-size: 12px;")
+        info.setStyleSheet("color: #9CA3AF; font-size: 12px;")
         layout.addWidget(info)
+
+        self.btn_export = QPushButton("EXPORT CLIPS")
+        self.btn_export.setObjectName("startBtn")
+        self.btn_export.clicked.connect(self._on_export_clips)
+        layout.addWidget(self.btn_export)
 
         return widget
 
@@ -448,13 +474,33 @@ class WorkflowWindow(QMainWindow):
             circle.setStyleSheet(f"color: {color}; font-size: 24px;")
             label.setStyleSheet(f"color: {color}; font-weight: {'bold' if is_current else 'normal'};")
 
+    def _on_browse_video(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Video File",
+            "",
+            "Video Files (*.mp4 *.mkv *.avi *.mov *.webm);;All Files (*)"
+        )
+        if file_path:
+            self.local_path_input.setText(file_path)
+            self.url_input.setText("")  # Clear URL when local file selected
+
     def _on_start_workflow(self):
         url = self.url_input.text().strip()
-        if not url:
+        local_path = self.local_path_input.text().strip()
+
+        if not url and not local_path:
             self.url_input.setStyleSheet(STYLESHEET_DARK + "QLineEdit { border: 2px solid #EF4444; }")
             return
 
         self.url_input.setStyleSheet(STYLESHEET_DARK)
+
+        self.video_path = local_path if local_path else url
+        display_path = local_path if local_path else url
+
+        self.upload_url_label.setText(f"Video: {display_path}")
+        self.upload_status_label.setText("Processing video...")
+        self.upload_title.setText("Video Loaded")
 
         duration_min = self.duration_min_spin.value()
         duration_max = self.duration_max_spin.value()
@@ -482,7 +528,7 @@ class WorkflowWindow(QMainWindow):
         self.analyze_substages.setText("Stage: Loading")
         QApplication.processEvents()
 
-        self._worker = WorkflowWorker(None, profile, analyzer)
+        self._worker = WorkflowWorker(self.video_path, profile, analyzer)
         self._worker.progress.connect(self._on_worker_progress)
         self._worker.finished.connect(self._on_worker_finished)
         self._worker.error.connect(self._on_worker_error)
@@ -550,3 +596,53 @@ class WorkflowWindow(QMainWindow):
 
             for col in range(6):
                 self.highlights_table.item(row, col).setForeground(QColor("#F9FAFB"))
+
+    def _on_export_clips(self):
+        self._show_stage(Stage.EXPORT)
+        self._update_stage_indicator(4)
+
+        selected_rows = set(item.row() for item in self.highlights_table.selectedItems())
+        if not selected_rows:
+            selected_rows = set(range(len(self.scored_highlights)))
+
+        selected_highlights = [self.scored_highlights[i] for i in selected_rows]
+
+        total_cuts = len(selected_highlights)
+        self.export_progress.setRange(0, total_cuts)
+        self.export_progress.setValue(0)
+
+        self.export_log.append(f"Starting export of {len(selected_highlights)} clips")
+
+        cut_count = 0
+        from core import Cutter
+
+        cutter = Cutter()
+
+        for h in selected_highlights:
+            try:
+                start = h.get("start", 0)
+                end = h.get("end", 0)
+                self.export_log.append(f"Cutting: {start:.1f}s - {end:.1f}s")
+
+                profile = Profile(
+                    name="default",
+                    format="16:9",
+                    duration_min=float(self.duration_min_spin.value()),
+                    duration_max=float(self.duration_max_spin.value()),
+                    quantity=1,
+                    score_minimum=0
+                )
+
+                output_path = cutter.cut_video(self.video_path, start, end, profile, index=cut_count)
+                self.export_log.append(f"  → Saved: {output_path.name}")
+
+            except Exception as e:
+                self.export_log.append(f"  → Error: {str(e)}")
+
+            cut_count += 1
+            self.export_progress.setValue(cut_count)
+            QApplication.processEvents()
+
+        self.export_progress.setValue(total_cuts)
+        self.export_status.setText(f"Export complete! {total_cuts} clips generated")
+        self.export_log.append(f"\n✓ All clips saved to output/")

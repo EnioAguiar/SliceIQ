@@ -1,0 +1,57 @@
+[
+  {
+    "start": 3402.0,
+    "end": 3418.0,
+    "score": 50,
+    "reason": "",
+    "hook_score": 95,
+    "viral_score": 93,
+    "duration_score": 2,
+    "total_score": 66,
+    "rank": 1
+  },
+  {
+    "start": 1423.9,
+    "end": 1447.9,
+    "score": 50,
+    "reason": "",
+    "hook_score": 93,
+    "viral_score": 89,
+    "duration_score": 4,
+    "total_score": 65,
+    "rank": 2
+  },
+  {
+    "start": 240.8,
+    "end": 249.8,
+    "score": 50,
+    "reason": "",
+    "hook_score": 92,
+    "viral_score": 90,
+    "duration_score": 1,
+    "total_score": 64,
+    "rank": 3
+  },
+  {
+    "start": 931.2,
+    "end": 947.2,
+    "score": 50,
+    "reason": "",
+    "hook_score": 91,
+    "viral_score": 89,
+    "duration_score": 2,
+    "total_score": 63,
+    "rank": 4
+  },
+  {
+    "start": 2488.2,
+    "end": 2510.2,
+    "score": 50,
+    "reason": "",
+    "hook_score": 90,
+    "viral_score": 88,
+    "duration_score": 3,
+    "total_score": 63,
+    "rank": 5
+  }
+]

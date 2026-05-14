@@ -105,7 +105,8 @@ Antes de responder, verificar se cada highlight está dentro do range permitido.
             json={
                 "model": model,
                 "messages": [{"role": "user", "content": prompt}]
-            }
+            },
+            timeout=120
         )
         logger.info(f"Minimax response: {response.json()}")
         data = response.json()
@@ -163,5 +164,6 @@ Antes de responder, verificar se cada highlight está dentro do range permitido.
         match = re.search(r'\{.*\}', response, re.DOTALL)
         if match:
             data = json.loads(match.group())
-            return [Highlight(**h) for h in data.get("highlights", [])]
+            highlights_data = data.get("candidates") or data.get("highlights") or []
+            return [Highlight(**h) for h in highlights_data]
         return []
