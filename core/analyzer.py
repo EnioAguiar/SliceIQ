@@ -36,19 +36,37 @@ class Analyzer:
                     f"[{s['start']:.1f}s - {s['end']:.1f}s]: {s['text']}"
                     for s in data["segments"]
                 ])
+                long_segments = [
+                    s for s in data["segments"]
+                    if (s["end"] - s["start"]) >= min_dur
+                ]
+                long_segments.sort(key=lambda s: s["end"] - s["start"], reverse=True)
+                examples_text = ""
+                for i, seg in enumerate(long_segments[:3]):
+                    duration = seg["end"] - seg["start"]
+                    examples_text += f'\nExample: {{"start": {seg["start"]:.1f}, "end": {seg["end"]:.1f}, "score": 85, "reason": "momento relevante com {duration:.0f}s"}}'
         else:
             segments_text = text
+            examples_text = ""
 
         return f"""Analise este transcript de vídeo e identifique os {quantity} melhores highlights.
 Duração desejada: {min_dur}s a {max_dur}s por highlight.
 Cada highlight deve ter timestamps de INÍCIO e FIM que sejam momentos distintos no vídeo (não consecutivos).
+Timestamps devem ser em SEGUNDOS EXATOS com 1 casa decimal (ex: 125.5, não 125 ou 125.567).
+{examples_text}
 
 Transcript com timestamps:
 {segments_text}
 
-Retorne em formato JSON:
+Raciocínio: Analisando transcript para momentos com alto potencial de destaque. Estou procurando:
+1. Momentos com hook forte (pergunta, declaração impactante)
+2. Trechos com informação densa ou citação marcante
+3. Momentos que respeitem o range de {min_dur}s a {max_dur}s
+Antes de responder, verificar se cada highlight está dentro do range permitido.
+
+→ Highlights (JSON):
 {{"highlights": [
-  {{"start": 0.0, "end": 30.0, "score": 85, "reason": "explicação do momento"}}
+  {{"start": 0.0, "end": 0.0, "score": 0, "reason": "..."}}
 ]}}"""
 
     def _call_llm(self, prompt: str, quantity: int = 5) -> str:

@@ -37,9 +37,9 @@
 
 ### Prompt Engineering
 
-- [ ] **PROMPT-01**: Prompt de candidatos usa few-shot examples se disponível
-- [ ] **PROMPT-02**: Prompt pede timestamps exatos (segundos, não minutos)
-- [ ] **PROMPT-03**: Prompt inclui chain-of-thought para reasoning sobre duração
+- [x] **PROMPT-01**: Prompt de candidatos usa few-shot examples do transcript
+- [x] **PROMPT-02**: Prompt pede timestamps exatos (segundos com 1 casa decimal)
+- [x] **PROMPT-03**: Prompt inclui chain-of-thought para reasoning sobre duração
 
 ### Cutter Integration
 
