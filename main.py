@@ -8,11 +8,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from PyQt6.QtWidgets import QApplication
-from ui.main_window import MainWindow
+from ui.workflow_window import WorkflowWindow
 
 def main():
     app = QApplication(sys.argv)
-    window = MainWindow()
+    window = WorkflowWindow()
     window.show()
     sys.exit(app.exec())
 
