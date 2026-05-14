@@ -15,7 +15,7 @@
       "format": "16:9",
       "duration_min": 45.0,
       "duration_max": 120.0,
-      "quantity": 5,
+      "quantity": 3,
       "score_minimum": 60,
       "tipo": "normal",
       "face_crop": false

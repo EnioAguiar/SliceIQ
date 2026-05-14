@@ -23,8 +23,12 @@ class Cutter:
         output_name: str = None
     ) -> Path:
         duration = end - start
-        if duration < profile.duration_min or duration > profile.duration_max:
-            raise ValueError(f"Duration {duration}s outside profile range")
+        if duration < profile.duration_min:
+            end = start + profile.duration_min
+            duration = profile.duration_min
+        elif duration > profile.duration_max:
+            end = start + profile.duration_max
+            duration = profile.duration_max
 
         input_path = Path(video_path)
         if output_name is None:
