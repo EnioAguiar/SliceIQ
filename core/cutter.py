@@ -21,15 +21,21 @@ class Cutter:
         end: float,
         profile: Profile,
         index: int = 0,
-        output_name: str = None
+        output_name: str = None,
+        strict_duration: bool = False
     ) -> Path:
         duration = end - start
-        if duration < profile.duration_min:
-            end = start + profile.duration_min
-            duration = profile.duration_min
-        elif duration > profile.duration_max:
-            end = start + profile.duration_max
-            duration = profile.duration_max
+        if strict_duration:
+            if duration < profile.duration_min:
+                raise ValueError(
+                    f"Duration {duration:.1f}s is below minimum {profile.duration_min}s. "
+                    f"Workflow should re-evaluate this highlight."
+                )
+            if duration > profile.duration_max:
+                raise ValueError(
+                    f"Duration {duration:.1f}s exceeds maximum {profile.duration_max}s. "
+                    f"Workflow should re-evaluate this highlight."
+                )
 
         input_path = Path(video_path)
         if output_name is None:
