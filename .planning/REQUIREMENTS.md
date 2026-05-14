@@ -56,15 +56,15 @@
 
 ### Multi-Profile
 
-- [ ] **MULTI-01**: Workflow pode gerar cortes para múltiplos profiles simultaneamente
-- [ ] **MULTI-02**: Cada profile mantém suas métricas de scoring separadamente
+- [x] **MULTI-01**: Workflow pode gerar cortes para múltiplos profiles simultaneamente
+- [x] **MULTI-02**: Cada profile mantém suas métricas de scoring separadamente
 
 ### UI Workflow Dialog
 
-- [ ] **UI-01**: Dialog mostra progresso por stage
-- [ ] **UI-02**: Lista de candidatos com scores
-- [ ] **UI-03**: User pode remover/reordenar candidatos antes do corte
-- [ ] **UI-04**: Preview do highlight (se possível com thumbnails)
+- [x] **UI-01**: Dialog mostra progresso por stage
+- [x] **UI-02**: Lista de candidatos com scores
+- [x] **UI-03**: User pode remover/reordenar candidatos antes do corte
+- [x] **UI-04**: Preview do highlight (se possível com thumbnails)
 
 ### Advanced Scoring
 

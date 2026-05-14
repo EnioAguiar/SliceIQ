@@ -193,9 +193,10 @@ class MainWindow(QMainWindow):
         self.btn_remove_profile = QPushButton("Remover Perfil")
         self.btn_select_video = QPushButton("Selecionar Vídeo")
         self.btn_process = QPushButton("Processar")
+        self.btn_ai_workflow = QPushButton("AI Workflow")
 
         for btn in [self.btn_add_profile, self.btn_edit_profile,
-                    self.btn_remove_profile, self.btn_select_video, self.btn_process]:
+                    self.btn_remove_profile, self.btn_select_video, self.btn_process, self.btn_ai_workflow]:
             btn_layout.addWidget(btn)
 
         layout.addWidget(buttons)
@@ -213,6 +214,7 @@ class MainWindow(QMainWindow):
         self.btn_remove_profile.clicked.connect(self._remove_profile)
         self.btn_select_video.clicked.connect(self._select_video)
         self.btn_process.clicked.connect(self._process_video)
+        self.btn_ai_workflow.clicked.connect(self._open_ai_workflow)
 
     def _load_profiles(self):
         from models.profile import Profile
@@ -306,3 +308,12 @@ class MainWindow(QMainWindow):
         ))
 
         self.worker.start()
+
+    def _open_ai_workflow(self):
+        from ui.workflow_dialog import WorkflowDialog
+        if not self.video_path:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "No Video", "Please select a video first")
+            return
+        dialog = WorkflowDialog(self.video_path, self)
+        dialog.exec()
