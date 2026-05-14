@@ -1,11 +1,151 @@
 import sys
+import logging
 from pathlib import Path
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,
     QListWidget, QPushButton, QProgressBar, QTextEdit,
     QLabel, QFileDialog
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QThread, pyqtSignal
+
+from ui.toast import ToastNotification
+from ui.title_dialog import TitleConfigDialog
+from core.title_generator import TitleGenerator
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('sliceiq.log'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
+
+class VideoWorker(QThread):
+    progress = pyqtSignal(int, str)
+    finished = pyqtSignal(bool, str)
+
+    def __init__(self, video_path, profile, title_mode=None, title_config=None):
+        super().__init__()
+        self.video_path = video_path
+        self.profile = profile
+        self.title_mode = title_mode
+        self.title_config = title_config or {}
+        self.highlights = []
+
+    def run(self):
+        try:
+            logger.info("=== INICIANDO PROCESSAMENTO ===")
+            self.progress.emit(10, "Importando módulos...")
+
+            from core import VideoProcessor, Transcript, Analyzer, Cutter
+
+            processor = VideoProcessor()
+            self.progress.emit(20, "Verificando vídeo...")
+            logger.info(f"Vídeo: {self.video_path}")
+
+            info = processor.get_video_info(self.video_path)
+            logger.info(f"Duração: {info['duration']:.1f}s")
+            self.progress.emit(30, f"Duração: {info['duration']:.1f}s")
+
+            self.progress.emit(35, "Carregando modelo Whisper...")
+            logger.info("Carregando Transcript...")
+            transcript = Transcript()
+
+            self.progress.emit(40, "Transcrevendo áudio (isso pode levar minutos)...")
+            logger.info("Iniciando transcrição...")
+            text = transcript.get_full_text(self.video_path)
+            logger.info(f"Transcript completo: {len(text)} caracteres")
+            self.progress.emit(50, f"Transcrição feita: {len(text)} caracteres")
+
+            self.progress.emit(55, "Carregando Analyzer...")
+            logger.info("Carregando Analyzer...")
+            from config.llm_config import LLMConfig
+            provider = "minimax" if LLMConfig.MINIMAX_API_KEY else "mock"
+            analyzer = Analyzer(provider=provider)
+
+            self.progress.emit(60, "Extraindo highlights...")
+            logger.info("Extraindo highlights...")
+            self.highlights = analyzer.extract_highlights(
+                text,
+                quantity=self.profile.quantity,
+                duration_min=self.profile.duration_min,
+                duration_max=self.profile.duration_max
+            )
+            logger.info(f"Encontrados {len(self.highlights)} highlights")
+            self.progress.emit(70, f"Encontrados {len(self.highlights)} highlights")
+
+            self.progress.emit(75, "Preparando cutter...")
+            logger.info("Preparando cutter...")
+            cutter = Cutter()
+
+            self.progress.emit(80, "Cortando vídeo...")
+            for i, h in enumerate(self.highlights):
+                logger.info(f"Cortando highlight {i+1}: {h.start:.1f}s - {h.end:.1f}s (score: {h.score})")
+                self.progress.emit(80 + (i * 20 // len(self.highlights)), f"Cortando highlight {i+1}/{len(self.highlights)}")
+                cutter.cut_video(self.video_path, h.start, h.end, self.profile)
+
+            # Generate titles
+            if self.title_mode:
+                self.progress.emit(95, "Gerando títulos...")
+                self._generate_titles()
+
+            self.progress.emit(100, "Concluído!")
+            logger.info("=== PROCESSAMENTO CONCLUÍDO ===")
+            self.finished.emit(True, f"Sucesso! {len(self.highlights)} clips gerados")
+
+        except Exception as e:
+            logger.error(f"ERRO: {e}", exc_info=True)
+            self.finished.emit(False, f"Erro: {str(e)}")
+
+    def _generate_titles(self):
+        import re
+        import json
+        from pathlib import Path
+        generator = TitleGenerator(self.title_mode, self.title_config)
+
+        output_dir = Path("output")
+        if not output_dir.exists():
+            return
+
+        clips = sorted(output_dir.glob("*.mp4"))
+        if not clips:
+            return
+
+        with open("transcript_debug.json", "r", encoding="utf-8") as f:
+            transcript_data = json.load(f)
+
+        renamed = 0
+        for i, clip in enumerate(clips):
+            if i >= len(self.highlights):
+                break
+
+            h = self.highlights[i]
+            segment_text = ""
+            for seg in transcript_data.get("segments", []):
+                if seg["start"] >= h.start - 1 and seg["end"] <= h.end + 1:
+                    segment_text += seg["text"] + " "
+
+            try:
+                title = generator.generate_title(
+                    highlight_text=segment_text.strip(),
+                    start=h.start,
+                    end=h.end,
+                    duration=h.end - h.start
+                )
+                safe_title = re.sub(r'[^a-zA-Z0-9_-]', '-', title)[:50]
+                new_name = f"{clip.stem}_{safe_title}.mp4"
+                new_path = output_dir / new_name
+                clip.rename(new_path)
+                logger.info(f"Título: {clip.name} -> {new_name}")
+                renamed += 1
+            except Exception as e:
+                logger.error(f"Erro ao gerar título para {clip.name}: {e}")
+
+        if renamed > 0:
+            logger.info(f"{renamed} títulos gerados com sucesso")
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -15,6 +155,8 @@ class MainWindow(QMainWindow):
 
         self.video_path = None
         self.profiles = []
+        self.toast = ToastNotification()
+        self.title_config = None
 
         self._setup_ui()
         self._load_profiles()
@@ -77,12 +219,37 @@ class MainWindow(QMainWindow):
             profile = dialog.get_profile()
             self.profiles.append(profile)
             self.profile_list.addItem(profile.name)
+            self._save_profiles()
 
     def _edit_profile(self):
-        pass
+        idx = self.profile_list.currentRow()
+        if idx < 0:
+            return
+
+        from ui.profile_dialog import ProfileDialog
+        dialog = ProfileDialog(self.profiles[idx])
+        if dialog.exec():
+            self.profiles[idx] = dialog.get_profile()
+            self.profile_list.item(idx).setText(dialog.get_profile().name)
+            self._save_profiles()
 
     def _remove_profile(self):
-        pass
+        idx = self.profile_list.currentRow()
+        if idx < 0:
+            self.log.append("Selecione um perfil para remover")
+            return
+        self.log.append(f"Removendo perfil: {self.profiles[idx].name}")
+        self.profiles.pop(idx)
+        self.profile_list.takeItem(idx)
+        self._save_profiles()
+        self.log.append("Perfil removido")
+
+    def _save_profiles(self):
+        import json
+        from config.settings import settings
+        data = {"profiles": [p.to_dict() for p in self.profiles]}
+        with open(settings.PROFILES_DIR / "default.json", "w") as f:
+            json.dump(data, f, indent=2)
 
     def _select_video(self):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -97,44 +264,30 @@ class MainWindow(QMainWindow):
             self.log.append("Selecione um vídeo primeiro")
             return
 
-        self.log.append("Iniciando processamento...")
-        self.progress.setValue(10)
+        if self.profile_list.currentRow() < 0:
+            self.log.append("Selecione um perfil primeiro")
+            return
 
-        from core import VideoProcessor, Transcript, Analyzer, Cutter
-        from models.profile import Profile
+        dialog = TitleConfigDialog()
+        if not dialog.exec():
+            return
 
-        processor = VideoProcessor()
-        self.progress.setValue(20)
+        mode, self.title_config = dialog.get_config()
+        self.log.clear()
+        self.log.append(f"Iniciando processamento (modo título: {mode})...")
+        self.progress.setValue(0)
+        self.btn_process.setEnabled(False)
 
-        info = processor.get_video_info(self.video_path)
-        self.log.append(f"Duração: {info['duration']:.1f}s")
+        profile = self.profiles[self.profile_list.currentRow()]
+        self.worker = VideoWorker(self.video_path, profile, mode, self.title_config)
 
-        self.progress.setValue(30)
+        self.worker.progress.connect(lambda val, msg: (
+            self.progress.setValue(val),
+            self.log.append(msg)
+        ))
+        self.worker.finished.connect(lambda ok, msg: (
+            self.log.append(msg),
+            self.btn_process.setEnabled(True)
+        ))
 
-        transcript = Transcript()
-        text = transcript.get_full_text(self.video_path)
-        self.log.append(f"Transcript completo: {len(text)} caracteres")
-
-        self.progress.setValue(50)
-
-        analyzer = Analyzer(provider="mock")
-        selected_profile = self.profiles[self.profile_list.currentRow()]
-
-        highlights = analyzer.extract_highlights(
-            text,
-            quantity=selected_profile.quantity,
-            duration_min=selected_profile.duration_min,
-            duration_max=selected_profile.duration_max
-        )
-
-        self.log.append(f"Encontrados {len(highlights)} highlights")
-
-        self.progress.setValue(70)
-
-        cutter = Cutter()
-        for i, h in enumerate(highlights):
-            self.log.append(f"Cortando highlight {i+1}: {h.start:.1f}s - {h.end:.1f}s (score: {h.score})")
-            cutter.cut_video(self.video_path, h.start, h.end, selected_profile)
-
-        self.progress.setValue(100)
-        self.log.append("Processamento completo!")
+        self.worker.start()
