@@ -11,7 +11,7 @@
 | 1 | Workflow Core | Estrutura base do workflow com 6 stages | WORKFLOW-01, WORKFLOW-02, WORKFLOW-03, CANDID-01, CANDID-02, CANDID-03, SCORE-01, SCORE-02, SCORE-03, SELECT-01, SELECT-02, SELECT-03, VALID-01, VALID-02, VALID-03, CUTTER-01, CUTTER-02, CUTTER-03, TITLE-01, TITLE-02 | 20/20 |
 | 2 | Prompt Engineering | 1/1 | Complete   | 2026-05-14 |
 | 3 | UI & Multi-Profile | 1/1 | Complete   | 2026-05-14 |
-| 4 | Advanced Scoring | Hook e Viral scores mais sofisticados | ADVSC-01, ADVSC-02, ADVSC-03 | 3/3 |
+| 4 | Advanced Scoring | 1/1 | Complete   | 2026-05-14 |
 
 ---
 
