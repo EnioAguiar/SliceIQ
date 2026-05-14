@@ -3,21 +3,28 @@
     {
       "name": "TikTok Short",
       "format": "9:16",
-      "duration_min": 15.0,
-      "duration_max": 30.0,
+      "duration_min": 30.0,
+      "duration_max": 60.0,
       "quantity": 3,
       "score_minimum": 70,
-      "tipo": "short",
       "face_crop": false
     },
     {
       "name": "YouTube Normal",
       "format": "16:9",
-      "duration_min": 45.0,
-      "duration_max": 120.0,
+      "duration_min": 180.0,
+      "duration_max": 600.0,
       "quantity": 3,
       "score_minimum": 60,
-      "tipo": "normal",
+      "face_crop": false
+    },
+    {
+      "name": "YouTube Long",
+      "format": "16:9",
+      "duration_min": 500.0,
+      "duration_max": 900.0,
+      "quantity": 5,
+      "score_minimum": 60,
       "face_crop": false
     }
   ]

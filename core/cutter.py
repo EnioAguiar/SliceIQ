@@ -20,6 +20,7 @@ class Cutter:
         start: float,
         end: float,
         profile: Profile,
+        index: int = 0,
         output_name: str = None
     ) -> Path:
         duration = end - start
@@ -32,7 +33,7 @@ class Cutter:
 
         input_path = Path(video_path)
         if output_name is None:
-            output_name = f"{input_path.stem}_{profile.name}_{start:.0f}s.mp4"
+            output_name = f"{input_path.stem}_{profile.name}_{index+1:03d}.mp4"
 
         output_path = self.output_dir / output_name
 

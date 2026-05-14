@@ -12,9 +12,9 @@ logger = logging.getLogger(__name__)
 class Transcript:
     MODELS = ["tiny", "base", "small", "medium", "large-v3"]
 
-    def __init__(self, model_size: str = "medium", device: str = "cpu"):
+    def __init__(self, model_size: str = "medium", device: str = None):
         self.model_size = model_size
-        self.device = device
+        self.device = device if device else ("cuda" if torch.cuda.is_available() else "cpu")
         self.model = None
 
     @staticmethod
@@ -22,10 +22,11 @@ class Transcript:
         return Transcript.MODELS
 
     def load_model(self):
+        compute_type = "float16" if self.device == "cuda" else "int8"
         self.model = WhisperModel(
             self.model_size,
-            device="cpu",
-            compute_type="int8"
+            device=self.device,
+            compute_type=compute_type
         )
 
     def _convert_video_to_wav(self, video_path: str) -> str:

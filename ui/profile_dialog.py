@@ -27,8 +27,8 @@ class ProfileDialog(QDialog):
         form.addRow("Duração Mín (s):", self.duration_min)
 
         self.duration_max = QDoubleSpinBox()
-        self.duration_max.setRange(10, 600)
-        self.duration_max.setValue(60)
+        self.duration_max.setRange(10, 900)
+        self.duration_max.setValue(120)
         form.addRow("Duração Máx (s):", self.duration_max)
 
         self.quantity = QSpinBox()
@@ -40,10 +40,6 @@ class ProfileDialog(QDialog):
         self.score_minimum.setRange(0, 100)
         self.score_minimum.setValue(60)
         form.addRow("Score Mínimo:", self.score_minimum)
-
-        self.tipo = QComboBox()
-        self.tipo.addItems(["short", "medio", "normal"])
-        form.addRow("Tipo:", self.tipo)
 
         self.face_crop = QCheckBox()
         form.addRow("Crop Rosto:", self.face_crop)
@@ -64,7 +60,6 @@ class ProfileDialog(QDialog):
         self.duration_max.setValue(profile.duration_max)
         self.quantity.setValue(profile.quantity)
         self.score_minimum.setValue(profile.score_minimum)
-        self.tipo.setCurrentText(profile.tipo)
         self.face_crop.setChecked(profile.face_crop)
 
     def get_profile(self):
@@ -76,6 +71,5 @@ class ProfileDialog(QDialog):
             duration_max=self.duration_max.value(),
             quantity=self.quantity.value(),
             score_minimum=self.score_minimum.value(),
-            tipo=self.tipo.currentText(),
             face_crop=self.face_crop.isChecked()
         )

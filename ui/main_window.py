@@ -55,9 +55,20 @@ class VideoWorker(QThread):
 
             self.progress.emit(40, "Transcrevendo áudio (isso pode levar minutos)...")
             logger.info("Iniciando transcrição...")
-            text = transcript.get_full_text(self.video_path)
-            logger.info(f"Transcript completo: {len(text)} caracteres")
-            self.progress.emit(50, f"Transcrição feita: {len(text)} caracteres")
+
+            from pathlib import Path
+            transcript_file = Path("transcript_debug.json")
+            if transcript_file.exists():
+                self.progress.emit(50, "Usando transcript existente...")
+                logger.info("Transcript já existe, pulando transcrição")
+                with open(transcript_file, "r", encoding="utf-8") as f:
+                    import json
+                    data = json.load(f)
+                    text = data.get("full_text", "")
+            else:
+                text = transcript.get_full_text(self.video_path)
+                logger.info(f"Transcript completo: {len(text)} caracteres")
+                self.progress.emit(50, f"Transcrição feita: {len(text)} caracteres")
 
             self.progress.emit(55, "Carregando Analyzer...")
             logger.info("Carregando Analyzer...")
@@ -84,67 +95,71 @@ class VideoWorker(QThread):
             for i, h in enumerate(self.highlights):
                 logger.info(f"Cortando highlight {i+1}: {h.start:.1f}s - {h.end:.1f}s (score: {h.score})")
                 self.progress.emit(80 + (i * 20 // len(self.highlights)), f"Cortando highlight {i+1}/{len(self.highlights)}")
-                cutter.cut_video(self.video_path, h.start, h.end, self.profile)
+                cutter.cut_video(self.video_path, h.start, h.end, self.profile, index=i)
 
             # Generate titles
+            title_suggestions = {}
             if self.title_mode:
-                self.progress.emit(95, "Gerando títulos...")
-                self._generate_titles()
+                clip_files = sorted(Path("output").glob("*.mp4"))
+                self.progress.emit(85, "Gerando títulos...")
+                title_suggestions = self._get_title_suggestions(clip_files)
 
             self.progress.emit(100, "Concluído!")
             logger.info("=== PROCESSAMENTO CONCLUÍDO ===")
-            self.finished.emit(True, f"Sucesso! {len(self.highlights)} clips gerados")
+
+            result_msg = f"Sucesso! {len(self.highlights)} clips gerados"
+            if title_suggestions:
+                result_msg += f"\n\n=== SUGESTÕES DE TÍTULOS ===\n"
+                for clip_path, suggestions in title_suggestions.items():
+                    clip_name = clip_path.name
+                    result_msg += f"\n📁 {clip_name}\n"
+                    for i, sug in enumerate(suggestions, 1):
+                        result_msg += f"   {i}. {sug}\n"
+
+            self.finished.emit(True, result_msg)
 
         except Exception as e:
             logger.error(f"ERRO: {e}", exc_info=True)
             self.finished.emit(False, f"Erro: {str(e)}")
 
     def _generate_titles(self):
-        import re
+        pass
+
+    def _get_title_suggestions(self, clip_files: list) -> dict:
         import json
         from pathlib import Path
-        generator = TitleGenerator(self.title_mode, self.title_config)
+        generator = TitleGenerator("auto", {})
 
-        output_dir = Path("output")
-        if not output_dir.exists():
-            return
-
-        clips = sorted(output_dir.glob("*.mp4"))
-        if not clips:
-            return
-
-        with open("transcript_debug.json", "r", encoding="utf-8") as f:
-            transcript_data = json.load(f)
-
-        renamed = 0
-        for i, clip in enumerate(clips):
+        suggestions = {}
+        for i, clip in enumerate(clip_files):
             if i >= len(self.highlights):
                 break
 
             h = self.highlights[i]
             segment_text = ""
-            for seg in transcript_data.get("segments", []):
-                if seg["start"] >= h.start - 1 and seg["end"] <= h.end + 1:
-                    segment_text += seg["text"] + " "
+            with open("transcript_debug.json", "r", encoding="utf-8") as f:
+                transcript_data = json.load(f)
+                for seg in transcript_data.get("segments", []):
+                    if seg["start"] >= h.start - 1 and seg["end"] <= h.end + 1:
+                        segment_text += seg["text"] + " "
 
-            try:
-                title = generator.generate_title(
-                    highlight_text=segment_text.strip(),
-                    start=h.start,
-                    end=h.end,
-                    duration=h.end - h.start
-                )
-                safe_title = re.sub(r'[^a-zA-Z0-9_-]', '-', title)[:50]
-                new_name = f"{clip.stem}_{safe_title}.mp4"
-                new_path = output_dir / new_name
-                clip.rename(new_path)
-                logger.info(f"Título: {clip.name} -> {new_name}")
-                renamed += 1
-            except Exception as e:
-                logger.error(f"Erro ao gerar título para {clip.name}: {e}")
+            clip_suggestions = []
+            for _ in range(1):
+                try:
+                    title = generator.generate_title(
+                        highlight_text=segment_text.strip(),
+                        start=h.start,
+                        end=h.end,
+                        duration=h.end - h.start
+                    )
+                    if title and title not in clip_suggestions:
+                        clip_suggestions.append(title)
+                except Exception as e:
+                    logger.error(f"Erro ao gerar título para {clip.name}: {e}")
 
-        if renamed > 0:
-            logger.info(f"{renamed} títulos gerados com sucesso")
+            suggestions[clip] = clip_suggestions
+
+        return suggestions
 
 
 class MainWindow(QMainWindow):
