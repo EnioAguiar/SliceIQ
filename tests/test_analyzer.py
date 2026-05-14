@@ -6,7 +6,7 @@ def test_analyzer_initialization():
     assert a.provider == "minimax"
 
 def test_mock_response():
-    a = Analyzer(provider="minimax")
+    a = Analyzer(provider="mock")
     highlights = a.extract_highlights("texto de teste", quantity=3)
     assert len(highlights) <= 3
     assert all(isinstance(h, Highlight) for h in highlights)
