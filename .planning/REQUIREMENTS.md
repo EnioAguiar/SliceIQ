@@ -7,33 +7,33 @@
 
 ### Workflow Architecture
 
-- [ ] **WORKFLOW-01**: Workflow executa 6 stages: ANALYZE → CANDIDATES → SCORE → SELECT → VALIDATE → CUT
-- [ ] **WORKFLOW-02**: Estado persiste entre stages em .planning/workflows/
-- [ ] **WORKFLOW-03**: Workflow re-avalia se Cutter precisaria estender mais de 30% do timestamp original
+- [x] **WORKFLOW-01**: Workflow executa 6 stages: ANALYZE → CANDIDATES → SCORE → SELECT → VALIDATE → CUT
+- [x] **WORKFLOW-02**: Estado persiste entre stages em .planning/workflows/
+- [x] **WORKFLOW-03**: Workflow re-avalia se Cutter precisaria estender mais de 30% do timestamp original
 
 ### Candidate Generation
 
-- [ ] **CANDID-01**: Analyzer gera 2-3x mais candidatos que quantity desejada (ex: quantity=5 → 12-15 candidatos)
-- [ ] **CANDID-02**: Prompt inclui duration target e constraints explícitos
-- [ ] **CANDID-03**: Candidatos incluem timestamps, score estimado, e reason
+- [x] **CANDID-01**: Analyzer gera 2-3x mais candidatos que quantity desejada (ex: quantity=5 → 12-15 candidatos)
+- [x] **CANDID-02**: Prompt inclui duration target e constraints explícitos
+- [x] **CANDID-03**: Candidatos incluem timestamps, score estimado, e reason
 
 ### Scoring
 
-- [ ] **SCORE-01**: Cada candidato recebe 3 scores: hook_score, viral_score, duration_score (0-100)
-- [ ] **SCORE-02**: Total score é weighted sum dos 3 dimensions
-- [ ] **SCORE-03**: Scoring feito em chamada separada da geração de candidatos
+- [x] **SCORE-01**: Cada candidato recebe 3 scores: hook_score, viral_score, duration_score (0-100)
+- [x] **SCORE-02**: Total score é weighted sum dos 3 dimensions
+- [x] **SCORE-03**: Scoring feito em chamada separada da geração de candidatos
 
 ### Selection
 
-- [ ] **SELECT-01**: Selecionar top N candidatos por total_score, onde N = profile.quantity
-- [ ] **SELECT-02**: Filtrar candidatos com overlap temporal (mesmo momento não pode ser cortado 2x)
-- [ ] **SELECT-03**: Filtrar candidatos com score < profile.score_minimum
+- [x] **SELECT-01**: Selecionar top N candidatos por total_score, onde N = profile.quantity
+- [x] **SELECT-02**: Filtrar candidatos com overlap temporal (mesmo momento não pode ser cortado 2x)
+- [x] **SELECT-03**: Filtrar candidatos com score < profile.score_minimum
 
 ### Validation
 
-- [ ] **VALID-01**: Validar cada highlight respeita duration_min/max antes de cortar
-- [ ] **VALID-02**: Se highlight fora do range, workflow re-avalia (não Cutter ajustar sozinho)
-- [ ] **VALID-03**: Log de validação mantido para debug
+- [x] **VALID-01**: Validar cada highlight respeita duration_min/max antes de cortar
+- [x] **VALID-02**: Se highlight fora do range, workflow re-avalia (não Cutter ajustar sozinho)
+- [x] **VALID-03**: Log de validação mantido para debug
 
 ### Prompt Engineering
 
@@ -43,14 +43,14 @@
 
 ### Cutter Integration
 
-- [ ] **CUTTER-01**: Cutter respeita timestamps do workflow, não ajusta sozinho
-- [ ] **CUTTER-02**: Se duration inválida, Cutter retorna erro para workflow
-- [ ] **CUTTER-03**: Face crop respeita profile.face_crop
+- [x] **CUTTER-01**: Cutter respeita timestamps do workflow, não ajusta sozinho
+- [x] **CUTTER-02**: Se duration inválida, Cutter retorna erro para workflow
+- [ ] **CUTTER-03**: Face crop respeita profile.face_crop (not implemented yet)
 
 ### Title Generation
 
-- [ ] **TITLE-01**: TitleGenerator usa highlight reason como input
-- [ ] **TITLE-02**: Títulos gerados em português brasileiro
+- [ ] **TITLE-01**: TitleGenerator usa highlight reason como input (not implemented yet)
+- [ ] **TITLE-02**: Títulos gerados em português brasileiro (not implemented yet)
 
 ## v2 Requirements
 
@@ -86,44 +86,46 @@
 
 | Requirement | Phase | Status |
 |------------|-------|--------|
-| WORKFLOW-01 | Phase 1 | Pending |
-| WORKFLOW-02 | Phase 1 | Pending |
-| WORKFLOW-03 | Phase 1 | Pending |
-| CANDID-01 | Phase 1 | Pending |
-| CANDID-02 | Phase 1 | Pending |
-| CANDID-03 | Phase 1 | Pending |
-| SCORE-01 | Phase 1 | Pending |
-| SCORE-02 | Phase 1 | Pending |
-| SCORE-03 | Phase 1 | Pending |
-| SELECT-01 | Phase 1 | Pending |
-| SELECT-02 | Phase 1 | Pending |
-| SELECT-03 | Phase 1 | Pending |
-| VALID-01 | Phase 1 | Pending |
-| VALID-02 | Phase 1 | Pending |
-| VALID-03 | Phase 1 | Pending |
-| PROMPT-01 | Phase 2 | Pending |
-| PROMPT-02 | Phase 2 | Pending |
-| PROMPT-03 | Phase 2 | Pending |
-| CUTTER-01 | Phase 1 | Pending |
-| CUTTER-02 | Phase 1 | Pending |
-| CUTTER-03 | Phase 1 | Pending |
-| TITLE-01 | Phase 1 | Pending |
-| TITLE-02 | Phase 1 | Pending |
-| MULTI-01 | Phase 3 | Pending |
-| MULTI-02 | Phase 3 | Pending |
-| UI-01 | Phase 3 | Pending |
-| UI-02 | Phase 3 | Pending |
-| UI-03 | Phase 3 | Pending |
-| UI-04 | Phase 3 | Pending |
-| ADVSC-01 | Phase 4 | Pending |
-| ADVSC-02 | Phase 4 | Pending |
-| ADVSC-03 | Phase 4 | Pending |
+| WORKFLOW-01 | Phase 1 | Complete |
+| WORKFLOW-02 | Phase 1 | Complete |
+| WORKFLOW-03 | Phase 1 | Complete |
+| CANDID-01 | Phase 1 | Complete |
+| CANDID-02 | Phase 1 | Complete |
+| CANDID-03 | Phase 1 | Complete |
+| SCORE-01 | Phase 1 | Complete |
+| SCORE-02 | Phase 1 | Complete |
+| SCORE-03 | Phase 1 | Complete |
+| SELECT-01 | Phase 1 | Complete |
+| SELECT-02 | Phase 1 | Complete |
+| SELECT-03 | Phase 1 | Complete |
+| VALID-01 | Phase 1 | Complete |
+| VALID-02 | Phase 1 | Complete |
+| VALID-03 | Phase 1 | Complete |
+| PROMPT-01 | Phase 2 | Complete |
+| PROMPT-02 | Phase 2 | Complete |
+| PROMPT-03 | Phase 2 | Complete |
+| CUTTER-01 | Phase 1 | Complete |
+| CUTTER-02 | Phase 1 | Complete |
+| CUTTER-03 | Phase 1 | Not Implemented |
+| TITLE-01 | Phase 1 | Not Implemented |
+| TITLE-02 | Phase 1 | Not Implemented |
+| MULTI-01 | Phase 3 | Complete |
+| MULTI-02 | Phase 3 | Complete |
+| UI-01 | Phase 3 | Complete |
+| UI-02 | Phase 3 | Complete |
+| UI-03 | Phase 3 | Complete |
+| UI-04 | Phase 3 | Complete |
+| ADVSC-01 | Phase 4 | Complete |
+| ADVSC-02 | Phase 4 | Complete |
+| ADVSC-03 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 23 total
+- Complete: 20
+- Not Implemented: 3 (CUTTER-03, TITLE-01, TITLE-02)
 - Mapped to phases: 23
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-05-14*
-*Last updated: 2026-05-14 after initial definition*
+*Last updated: 2026-05-15 after milestone v1.0 implementation*
