@@ -129,9 +129,34 @@ class VideoClippingWorkflow:
                 data = json.load(f)
             self._state["transcript_segments"] = data.get("segments", [])
             self._state["has_transcript"] = True
+            logger.info(f"Loaded transcript from {transcript_file}: {len(self._state['transcript_segments'])} segments")
         else:
-            self._state["transcript_segments"] = []
-            self._state["has_transcript"] = False
+            logger.info("No transcript_debug.json found. Attempting to extract from video...")
+            try:
+                from core.transcript import Transcript
+
+                if hasattr(self.video_path, 'startswith') and not self.video_path.startswith('http'):
+                    from core.video_processor import VideoProcessor
+                    processor = VideoProcessor()
+                    video_info = processor.get_video_info(self.video_path)
+                    if video_info:
+                        logger.info(f"Processing video: {video_info.get('title', 'unknown')}")
+
+                transcript = Transcript()
+                segments = transcript.transcribe(self.video_path)
+                if segments:
+                    self._state["transcript_segments"] = segments
+                    self._state["has_transcript"] = True
+                    logger.info(f"Extracted transcript from video: {len(segments)} segments")
+                else:
+                    logger.warning("Failed to extract transcript from video")
+                    self._state["transcript_segments"] = []
+                    self._state["has_transcript"] = False
+            except Exception as e:
+                logger.error(f"Failed to extract transcript: {e}")
+                self._state["transcript_segments"] = []
+                self._state["has_transcript"] = False
+
         self._state["stage"] = WorkflowStage.ANALYZED.value
 
     def _stage_generate_candidates(self):
@@ -148,15 +173,6 @@ class VideoClippingWorkflow:
         ])
 
         num_candidates = self.profile.quantity * 3
-
-        if len(segments) > 500:
-            step = len(segments) // 500
-            sampled_segments = segments[::step]
-            segments_text = "\n".join([
-                f"[{s['start']:.1f}s - {s['end']:.1f}s]: {s['text']}"
-                for s in sampled_segments
-            ])
-            logger.warning(f"Transcript sampled: {len(segments)} segments → {len(sampled_segments)} (1 of every {step})")
 
         duration_target = (self.profile.duration_min + self.profile.duration_max) / 2
 
@@ -222,10 +238,23 @@ Escolha {num_candidates} momentos que:
         if not self._state.get("candidates"):
             raise WorkflowError("No candidates to score. Run GENERATE_CANDIDATES first.")
 
-        candidates_list = "\n".join([
-            f"- start={c['start']:.1f}s, end={c['end']:.1f}s, score={c['score']}, reason={c['reason']}"
-            for c in self._state["candidates"]
-        ])
+        segments = self._state.get("transcript_segments", [])
+
+        def get_transcript_text(start: float, end: float) -> str:
+            text_parts = []
+            for seg in segments:
+                if seg["start"] >= start - 1 and seg["end"] <= end + 1:
+                    text_parts.append(seg["text"])
+            return " ".join(text_parts) if text_parts else "[texto não disponível]"
+
+        candidates_with_text = []
+        for c in self._state["candidates"]:
+            text = get_transcript_text(c["start"], c["end"])
+            candidates_with_text.append(f"""- start={c['start']:.1f}s, end={c['end']:.1f}s
+  reason: {c['reason']}
+  texto: {text[:500]}""")
+
+        candidates_list = "\n".join(candidates_with_text)
 
         target = (self.profile.duration_min + self.profile.duration_max) / 2
         duration_range = self.profile.duration_max - self.profile.duration_min
@@ -250,18 +279,18 @@ Escolha {num_candidates} momentos que:
 3. DURATION_SCORE (30% do total): Quão bem respeita a duração target?
    - Target: {target:.0f}s, Range: {duration_range:.0f}s ({self.profile.duration_min:.0f}s - {self.profile.duration_max:.0f}s)
    - Formula: score = 100 - (|duration - target| / range) * 100
-   - Exemplo: se target={target:.0f}s e range={duration_range:.0f}s, uma duração de {target - duration_range/4:.0f}s teria score ~75
    - SCORE ALTO: duração próxima do target
-   - SCORE BAIXO: duração longe do target (muito curto ou muito longo)
 
 Duração real de cada candidato deve ser calculada como: end - start
+
+LEIA O TEXTO de cada candidato para avaliar HOOK e VIRAL corretamente!
 
 Candidatos:
 {candidates_list}
 
-Raciocínio: Analisando cada candidato... penso sobre hook forte, elemento viral, e proximidade do target... calculo scores...
+Raciocínio: Analisando cada candidato... leio o texto, penso sobre hook forte, elemento viral, e proximidade do target... calculo scores...
 
-→ JSON Output (use duration_score baseado em formula, não apenas comply):
+→ JSON Output:
 {{"scored": [
   {{"start": float, "end": float, "hook_score": int, "viral_score": int, "duration_score": int}}
 ]}}"""

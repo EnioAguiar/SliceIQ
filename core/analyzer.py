@@ -25,6 +25,17 @@ class Analyzer:
         response = self._call_llm(prompt, quantity)
         return self._parse_response(response)
 
+    def _sample_transcript(self, segments: list, max_chars: int = 50000) -> str:
+        result = []
+        total_chars = 0
+        for seg in segments:
+            text = f"[{seg['start']:.1f}s - {seg['end']:.1f}s]: {seg['text']}"
+            if total_chars + len(text) > max_chars:
+                break
+            result.append(text)
+            total_chars += len(text)
+        return "\n".join(result)
+
     def _build_prompt(self, text: str, quantity: int, min_dur: float, max_dur: float) -> str:
         import json
         from pathlib import Path
@@ -32,10 +43,7 @@ class Analyzer:
         if transcript_file.exists():
             with open(transcript_file, "r") as f:
                 data = json.load(f)
-                segments_text = "\n".join([
-                    f"[{s['start']:.1f}s - {s['end']:.1f}s]: {s['text']}"
-                    for s in data["segments"]
-                ])
+                segments_text = self._sample_transcript(data["segments"], max_chars=50000)
                 long_segments = [
                     s for s in data["segments"]
                     if (s["end"] - s["start"]) >= min_dur
@@ -50,24 +58,24 @@ class Analyzer:
             examples_text = ""
 
         return f"""Analise este transcript de vídeo e identifique os {quantity} melhores highlights.
-Duração desejada: {min_dur}s a {max_dur}s por highlight.
-Cada highlight deve ter timestamps de INÍCIO e FIM que sejam momentos distintos no vídeo (não consecutivos).
-Timestamps devem ser em SEGUNDOS EXATOS com 1 casa decimal (ex: 125.5, não 125 ou 125.567).
-{examples_text}
+        Duração desejada: {min_dur}s a {max_dur}s por highlight.
+        Cada highlight deve ter timestamps de INÍCIO e FIM que sejam momentos distintos no vídeo (não consecutivos).
+        Timestamps devem ser em SEGUNDOS EXATOS com 1 casa decimal (ex: 125.5, não 125 ou 125.567).
+        {examples_text}
 
-Transcript com timestamps:
-{segments_text}
+        Transcript com timestamps:
+        {segments_text}
 
-Raciocínio: Analisando transcript para momentos com alto potencial de destaque. Estou procurando:
-1. Momentos com hook forte (pergunta, declaração impactante)
-2. Trechos com informação densa ou citação marcante
-3. Momentos que respeitem o range de {min_dur}s a {max_dur}s
-Antes de responder, verificar se cada highlight está dentro do range permitido.
+        Raciocínio: Analisando transcript para momentos com alto potencial de destaque. Estou procurando:
+        1. Momentos com hook forte (pergunta, declaração impactante)
+        2. Trechos com informação densa ou citação marcante
+        3. Momentos que respeitem o range de {min_dur}s a {max_dur}s
+        Antes de responder, verificar se cada highlight está dentro do range permitido.
 
-→ Highlights (JSON):
-{{"highlights": [
-  {{"start": 0.0, "end": 0.0, "score": 0, "reason": "..."}}
-]}}"""
+        → Highlights (JSON):
+        {{"highlights": [
+          {{"start": 0.0, "end": 0.0, "score": 0, "reason": "..."}}
+        ]}}"""
 
     def _call_llm(self, prompt: str, quantity: int = 5) -> str:
         if self.provider == "mock":

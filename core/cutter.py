@@ -1,6 +1,7 @@
 import ffmpeg
 from pathlib import Path
 import logging
+from models.profile import Profile
 
 logger = logging.getLogger(__name__)
 
