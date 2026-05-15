@@ -1,50 +1,52 @@
 # State: CortesVideos
 
-**Last updated:** 2026-05-14 after initialization
+**Last updated:** 2026-05-15 after v1.0 milestone
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-14)
+See: .planning/PROJECT.md (updated 2026-05-15)
+**Version:** v1.0 MVP (shipped)
+**Next:** v1.1 — Face Crop & Title Generation
 
-**Core value:** Precisão — Timestamps que IA escolhe devem refletir exatamente o que o cutter vai usar
+## Milestone Complete
 
-**Current focus:** Phase 2 - Prompt Engineering
+**v1.0 MVP:** Shipped 2026-05-15
+- Phases: 4 complete
+- Requirements: 20/23 complete (3 deferred to v1.1)
 
 ## Session Continuity
 
-**Last session:** 2026-05-14
-**Command:** /gsd-new-project
-**Stage:** Complete (initialized)
+**Last session:** 2026-05-15
+**Command:** /gsd-complete-milestone v1.0
+**Stage:** Complete
 
-## Progress
+## Deferred to v1.1
 
-| Phase | Status | Progress |
-|-------|--------|----------|
-| 1 | ✓ Complete | 100% |
-| 2 | ○ Pending | 0% |
-| 3 | ○ Pending | 0% |
-| 4 | ○ Pending | 0% |
+- CUTTER-03: Face crop
+- TITLE-01: TitleGenerator uses highlight reason
+- TITLE-02: Títulos gerados em português brasileiro
 
 ## Key Decisions Made
 
 | When | Decision | Rationale |
-|------|----------|----------|
-| Init | Workflow multi-stage | Separar geração de avaliação permite precisão |
-| Init | Validação antes do corte | Impedir Cutter ajustar sozinho |
-| Init | Minimax como default | API disponível, funciona bem |
+|------|----------|-----------|
+| v1.0 | Workflow multi-stage | Separar geração de avaliação permite precisão |
+| v1.0 | Validação antes do corte | Impedir Cutter ajustar sozinho |
+| v1.0 | Transcript sampling 50k | Evitar timeout no LLM |
+| v1.0 | Minimax como default | API disponível |
 
 ## Notes
 
-- Bug atual: Cutter estende timestamps além do que IA escolheu
-- Solução: Workflow re-avalia se ajuste > 30% necessário
-- Foco em politik/YouTube para vídeos brasileiros
+- Transcript sampling: 50k char limit
+- 30% validation threshold working
+- Workflow state persists in .planning/workflows/
 
 ## Artifacts
 
 | Artifact | Location |
 |----------|----------|
 | Project | `.planning/PROJECT.md` |
-| Config | `.planning/config.json` |
-| Requirements | `.planning/REQUIREMENTS.md` |
+| Milestones | `.planning/MILESTONES.md` |
 | Roadmap | `.planning/ROADMAP.md` |
-| Plan | `.planning/phases/01-workflow/01-01-PLAN.md` |
+| Archive | `.planning/milestones/v1.0-ROADMAP.md` |
+| Requirements Archive | `.planning/milestones/v1.0-REQUIREMENTS.md` |

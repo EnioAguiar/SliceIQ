@@ -14,18 +14,18 @@ Sistema de clipping de vídeos YouTube (focado em política brasileira) que usa 
 
 ### Validated
 
-- ✓ Integração Analyzer + Cutter + TitleGenerator — funcionando
-- ✓ Suporte múltiplos providers LLM (minimax, gemini, ollama)
-- ✓ Profile system com duration constraints
-- ✓ Corte com ffmpeg mantendo qualidade
+- ✓ Workflow multi-stage (ANALYZE → CANDIDATES → SCORE → SELECT → VALIDATE → CUT) — v1.0
+- ✓ Estado persistente entre stages — v1.0
+- ✓ Validação de duration (30% threshold) — v1.0
+- ✓ Scoring multi-dimensional (hook, viral, duration) — v1.0
+- ✓ Prompt engineering (few-shot + CoT) — v1.0
+- ✓ WorkflowWindow UI com sidebar — v1.0
+- ✓ Multi-profile support — v1.0
 
 ### Active
 
-- [ ] Workflow multi-stage (candidatos → scoring → seleção → validação)
-- [ ] Prompt engineering para precisão em timestamps
-- [ ] Validação de duration antes do corte
-- [ ] Scoring multi-dimensional (hook, viral, duration compliance)
-- [ ] Estado persistente entre stages
+- [ ] Face crop (CUTTER-03)
+- [ ] Title generation (TITLE-01, TITLE-02)
 
 ### Out of Scope
 
@@ -35,28 +35,11 @@ Sistema de clipping de vídeos YouTube (focado em política brasileira) que usa 
 
 ## Context
 
-### Problema Atual
+### v1.0 Shipped
 
-O workflow atual:
-1. Analyzer pede X highlights à IA
-2. IA retorna timestamps (ex: start=100, end=120 para "2 min")
-3. Cutter vê "2 min < 15 min min" → estende para start=100, end=1000 (15 min)
-4. **Problema:** 13 min extras não eram escolha da IA — escolha foi corrompida
-
-**Causa provável:** Prompt não induz comportamento correto + falta de validação entre stages.
-
-### O que funciona
-
-- Integração Analyzer → Cutter → TitleGenerator
-- Corte com ffmpeg
-- Profile system (nome, formato, duration_min, duration_max, quantity)
-- Geração de títulos com IA
-
-### O que não funciona
-
-- IA não respeita duration_min/max consistentemente
-- Falta de workflow estruturado (candidatos → avaliação → seleção)
-- Validação ausente entre escolha da IA e corte efetivo
+MVP completo com 20/23 requirements. 3 deferidos para v1.1:
+- CUTTER-03: Face crop
+- TITLE-01, TITLE-02: Title generation
 
 ### Stack Atual
 
@@ -65,39 +48,19 @@ O workflow atual:
 - LLM: minimax (default), gemini, ollama
 - Pydantic (models)
 
-## Constraints
-
-- **Duração:** Cortes devem respeitar duration_min e duration_max do Profile
-- **Precisão:** Timestamp chosen = timestamp usado (sem ajuste automático silencioso)
-- **Provider:** Minimax como default, manter flexibilidade para troca
-- **UI:** Interface PyQt6 existente
-
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Workflow multi-stage | Separar geração de candidatos de avaliação permite precisão | — Pending |
-| Validação antes do corte | Impedir Cutter de ajustar sozinho, workflow re-avalia | — Pending |
-| Scoring multi-dimensional | Hook + Viral + Duration compliance scores | — Pending |
-| Estado persistente | .planning/workflows/ para recover em caso de falha | — Pending |
-| Minimax como default | API key disponível, funciona bem com timestamp | — Pending |
+| Workflow multi-stage | Separar geração de candidatos de avaliação permite precisão | ✓ Working |
+| Validação antes do corte | Impedir Cutter de ajustar sozinho, workflow re-avalia | ✓ Working |
+| Transcript sampling 50k | Evitar timeout no LLM | ✓ Working |
+| Minimax como default | API key disponível | ✓ Working |
 
-## Evolution
+## Current State
 
-This document evolves at phase transitions and milestone boundaries.
-
-**After each phase transition** (via `/gsd-transition`):
-1. Requirements invalidated? → Move to Out of Scope with reason
-2. Requirements validated? → Move to Validated with phase reference
-3. New requirements emerged? → Add to Active
-4. Decisions to log? → Add to Key Decisions
-5. "What This Is" still accurate? → Update if drifted
-
-**After each milestone** (via `/gsd-complete-milestone`):
-1. Full review of all sections
-2. Core Value check — still the right priority?
-3. Audit Out of Scope — reasons still valid?
-4. Update Context with current state
+**Version:** v1.0 MVP (shipped 2026-05-15)
+**Next Milestone:** v1.1 — Face Crop & Title Generation
 
 ---
-*Last updated: 2026-05-14 after initialization*
+*Last updated: 2026-05-15 after v1.0 milestone*
